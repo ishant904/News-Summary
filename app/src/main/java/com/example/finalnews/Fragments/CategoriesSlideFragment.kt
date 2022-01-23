@@ -10,20 +10,24 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Observer
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.example.finalnews.MainActivity
 import com.example.finalnews.R
-import com.example.finalnews.Sources.SourcesInfo
+import com.example.finalnews.viewModelsAndFactory.SelectionViewModel
 import me.grantland.widget.AutofitTextView
 
-class CategoriesSlidePageFragment : Fragment() {
+class CategoriesSlideFragment : Fragment() {
 
     interface OnItemClickListener {
         fun onItemClickCategories(item: String)
     }
 
     private lateinit var listener: OnItemClickListener
+    private val sharedViewModel: SelectionViewModel by activityViewModels()
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -31,7 +35,9 @@ class CategoriesSlidePageFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater,container: ViewGroup?,savedInstanceState: Bundle?): View {
+
         val rootView = inflater.inflate(R.layout.fragment_categories_slide_page, container, false) as ViewGroup
+
         val mRecyclerView: RecyclerView = rootView.findViewById(R.id.recyclerView_categories)
         val numberOfColumns : Int = requireContext().resources.getString(R.string.no_of_cols).toInt()
         //int numberOfColumns = Integer.parseInt(getContext().getResources().getString(R.string.no_of_cols));
@@ -39,14 +45,22 @@ class CategoriesSlidePageFragment : Fragment() {
         mRecyclerView.setHasFixedSize(true)
         val mAdapter = CategoriesAdapter()
         mRecyclerView.adapter = mAdapter
+
+        sharedViewModel.mCategoriesSelectedLv.observe(viewLifecycleOwner, Observer {
+            mAdapter.data = it
+            Log.d(CategoriesSlideFragment::class.java.name,"categories observer data changed")
+        })
+
         return rootView
     }
 
-    inner class CategoriesAdapter() : RecyclerView.Adapter<CategoriesAdapter.CategoriesAdapterViewHolder>() {
-        var mSourcesInfo: SourcesInfo? = null
-        init {
-            mSourcesInfo = MainActivity.getSourceInfo()
-        }
+    inner class CategoriesAdapter : RecyclerView.Adapter<CategoriesAdapter.CategoriesAdapterViewHolder>() {
+
+        var data:ArrayList<String>? = arrayListOf()
+            set(value) {
+                field = value
+                notifyDataSetChanged()
+            }
 
         override fun onCreateViewHolder(parent: ViewGroup,viewType: Int): CategoriesAdapterViewHolder {
             val context = parent.context
@@ -60,7 +74,7 @@ class CategoriesSlidePageFragment : Fragment() {
             holder.mCategoryImageView.setImageResource(mThumbIds[position])
             holder.mCategoryTextView.text = mCategories[position]
             holder.bind(mCategories[position], listener)
-            if (mSourcesInfo?.mCategoriesSelected?.contains(mCategories[position])!!) {
+            if (sharedViewModel.mSourceInfo.value?.mCategoriesSelected?.contains(mCategories[position]) == true) {
                 holder.mCategoryConstraintLayout.setBackgroundColor(resources.getColor(R.color.colorPrimaryDark))
             } else {
                 holder.mCategoryConstraintLayout.setBackgroundColor(Color.TRANSPARENT)
@@ -79,8 +93,6 @@ class CategoriesSlidePageFragment : Fragment() {
             fun bind(mCategory: String,clickListener: OnItemClickListener) {
                 itemView.setOnClickListener {
                     clickListener.onItemClickCategories(mCategory)
-                    mSourcesInfo = MainActivity.getSourceInfo() //The SourcesInfo would have changed now from MainActivity
-                    notifyDataSetChanged()
                 }
             }
         }
@@ -94,4 +106,17 @@ class CategoriesSlidePageFragment : Fragment() {
         "Business", "Entertainment", "Health", "Science",
         "Sports", "Technology"
     )
+}
+
+class CategoriesDiffCallback : DiffUtil.ItemCallback<String>() {
+
+    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem === newItem
+    }
+
+
+    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
+    }
+
 }

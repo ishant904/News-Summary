@@ -1,7 +1,6 @@
 package com.example.finalnews.Fragments
 
 import android.content.Context
-import android.content.res.Resources
 import android.graphics.Color
 import android.os.Bundle
 import android.util.DisplayMetrics
@@ -9,24 +8,28 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.example.finalnews.MainActivity
 import com.example.finalnews.R
-import com.example.finalnews.Sources.SourcesInfo
+import com.example.finalnews.viewModelsAndFactory.*
 
-class PublishersSlidePageFragment : Fragment() {
+class PublishersSlideFragment : Fragment() {
 
     interface OnItemClickListener {
         fun onItemClickPublishers(item: String)
     }
 
     private lateinit var listener: OnItemClickListener
+    private val sharedViewModel: SelectionViewModel by activityViewModels()
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -34,13 +37,21 @@ class PublishersSlidePageFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater,container: ViewGroup?,savedInstanceState: Bundle?): View {
+
         val rootView = inflater.inflate(R.layout.fragment_publishers_slide_page, container, false) as ViewGroup
+
         val mRecyclerView: RecyclerView = rootView.findViewById(R.id.recyclerView_publishers)
         //int numberOfColumns = Integer.parseInt(getContext().getResources().getString(R.string.no_of_cols));
         mRecyclerView.layoutManager = GridLayoutManager(context, getNumberofColumns())
         mRecyclerView.setHasFixedSize(true)
         val mAdapter = PublishersAdapter()
         mRecyclerView.adapter = mAdapter
+
+        sharedViewModel.mPublishersSelectedLv.observe(viewLifecycleOwner, Observer {
+            mAdapter.data = it
+            Log.d(PublishersSlideFragment::class.java.name,"publisher observer data changed")
+        })
+
         return rootView
     }
 
@@ -53,11 +64,13 @@ class PublishersSlidePageFragment : Fragment() {
         return if (nColumns < 2) 2 else nColumns
     }
 
-    inner class PublishersAdapter() : RecyclerView.Adapter<PublishersAdapter.PublishersAdapterViewHolder>() {
-        var mSourcesInfo: SourcesInfo? = null
-        init {
-            mSourcesInfo = MainActivity.getSourceInfo()
-        }
+    inner class PublishersAdapter : RecyclerView.Adapter<PublishersAdapter.PublishersAdapterViewHolder>() {
+
+        var data:ArrayList<String>? = arrayListOf()
+            set(value) {
+                field = value
+                notifyDataSetChanged()
+            }
 
         override fun onCreateViewHolder(parent: ViewGroup,viewType: Int): PublishersAdapterViewHolder {
             val context = parent.context
@@ -70,7 +83,7 @@ class PublishersSlidePageFragment : Fragment() {
             holder.mPublisherImageView.setImageResource(mThumbIds[position])
             holder.mPublisherTextView.text = mPublishers[position]
             holder.bind(mPublishers[position], listener, position)
-            if (mSourcesInfo?.mPublishersSelected?.contains(mPublishers[position]) == true) {
+            if (sharedViewModel.mSourceInfo.value?.mPublishersSelected?.contains(mPublishers[position]) == true) {
                 //source has been selected
                 holder.mPublisherConstraintLayout.setBackgroundColor(resources.getColor(R.color.colorPrimaryDark))
             } else {
@@ -90,8 +103,6 @@ class PublishersSlidePageFragment : Fragment() {
             fun bind(mPublisher: String, clickListener: OnItemClickListener, position: Int) {
                 itemView.setOnClickListener {
                     clickListener.onItemClickPublishers(mPublisher)
-                    mSourcesInfo = MainActivity.getSourceInfo()
-                    notifyDataSetChanged()
                 }
             }
         }
@@ -143,5 +154,18 @@ class PublishersSlidePageFragment : Fragment() {
         "NYT",
         "Wall Street Journal"
     )
+
+}
+
+class PublishersDiffCallback : DiffUtil.ItemCallback<String>() {
+
+    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem === newItem
+    }
+
+
+    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
+    }
 
 }

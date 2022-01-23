@@ -11,14 +11,20 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.example.finalnews.MainActivity
 import com.example.finalnews.R
-import com.example.finalnews.Sources.SourcesInfo
+import com.example.finalnews.viewModelsAndFactory.SelectionViewModel
 
-class CountriesSlidePageFragment : Fragment() {
+class CountriesSlideFragment : Fragment() {
+
     private lateinit var listener: OnItemClickListener
+    private val sharedViewModel: SelectionViewModel by activityViewModels()
 
     interface OnItemClickListener {
         fun onItemClickCountries(item: String)
@@ -31,22 +37,29 @@ class CountriesSlidePageFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater,container: ViewGroup?,savedInstanceState: Bundle?): View {
+
         val rootView = inflater.inflate(R.layout.fragment_countries_slide_page, container, false) as ViewGroup
+
         val mRecyclerView: RecyclerView = rootView.findViewById(R.id.recyclerView_countries)
         val numberOfColumns = requireContext().resources.getString(R.string.no_of_cols).toInt()
         mRecyclerView.layoutManager = GridLayoutManager(context, numberOfColumns)
         mRecyclerView.setHasFixedSize(true)
         val mAdapter = CountriesAdapter()
         mRecyclerView.adapter = mAdapter
+        sharedViewModel.mCountriesSelectedLv.observe(viewLifecycleOwner, Observer {
+            mAdapter.data = it
+            Log.d(CountriesSlideFragment::class.java.name,"countries observer data changed")
+        })
         return rootView
     }
 
      inner class CountriesAdapter() : RecyclerView.Adapter<CountriesAdapter.CountriesAdapterViewHolder>() {
-         private var mSourcesInfo: SourcesInfo? = null
 
-         init {
-             mSourcesInfo = MainActivity.getSourceInfo()
-         }
+         var data:ArrayList<String>? = arrayListOf()
+             set(value) {
+                 field = value
+                 notifyDataSetChanged()
+             }
 
          override fun onCreateViewHolder(parent: ViewGroup,viewType: Int): CountriesAdapterViewHolder {
              val context = parent.context
@@ -60,7 +73,7 @@ class CountriesSlidePageFragment : Fragment() {
              holder.mCountryImageView.setImageResource(mThumbIds[position])
              holder.mCountryTextView.text = mCountries[position]
              holder.bind(mCountries[position], listener)
-             if (mSourcesInfo?.mCountriesSelected?.contains(mCountries[position])!!) {
+             if (sharedViewModel.mSourceInfo.value?.mCountriesSelected?.contains(mCountries[position]) == true) {
                  holder.mCountryConstraintLayout.setBackgroundColor(resources.getColor(R.color.colorPrimaryDark))
              } else {
                  holder.mCountryConstraintLayout.setBackgroundColor(Color.TRANSPARENT)
@@ -79,8 +92,6 @@ class CountriesSlidePageFragment : Fragment() {
               fun bind(mCountry: String,clickListener: OnItemClickListener) {
                   itemView.setOnClickListener {
                       clickListener.onItemClickCountries(mCountry)
-                      mSourcesInfo = MainActivity.getSourceInfo() //The SourcesInfo would have changed now from MainActivity
-                      notifyDataSetChanged()
                   }
               }
          }
@@ -199,4 +210,17 @@ class CountriesSlidePageFragment : Fragment() {
         "U.S.A",
         "Venezuela"
     )
+}
+
+class CountriesDiffCallback : DiffUtil.ItemCallback<String>() {
+
+    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem === newItem
+    }
+
+
+    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
+    }
+
 }

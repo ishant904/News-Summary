@@ -3,6 +3,7 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/AndroidProgramming/FinalNews/app/src/main/res/layout/activity_main.xml" value="0.1" />
         <entry key="..\:/AndroidProgramming/finalnews-main/FinalNews-main/app/src/main/res/layout/activity_main.xml" value="0.25416666666666665" />
         <entry key="..\:/AndroidProgramming/finalnews-main/FinalNews-main/app/src/main/res/layout/activity_news_articles.xml" value="0.25416666666666665" />
         <entry key="..\:/AndroidProgramming/finalnews-main/FinalNews-main/app/src/main/res/layout/activity_settings.xml" value="0.25416666666666665" />

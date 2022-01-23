@@ -2,62 +2,47 @@ package com.example.finalnews
 
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.SharedPreferences.Editor
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.databinding.DataBindingUtil
+import androidx.lifecycle.ViewModelProvider
 import androidx.preference.PreferenceManager
 import androidx.viewpager.widget.ViewPager
 import com.example.finalnews.Adapters.SectionsPageAdapter
-import com.example.finalnews.Fragments.CategoriesSlidePageFragment
-import com.example.finalnews.Fragments.CountriesSlidePageFragment
-import com.example.finalnews.Fragments.PublishersSlidePageFragment
-import com.example.finalnews.Sources.SourcesInfo
-import com.example.finalnews.Sources.UserSettings
+import com.example.finalnews.Fragments.CategoriesSlideFragment
+import com.example.finalnews.Fragments.CountriesSlideFragment
+import com.example.finalnews.Fragments.PublishersSlideFragment
+import com.example.finalnews.viewModelsAndFactory.SelectionViewModel
+import com.example.finalnews.viewModelsAndFactory.SelectionViewModelFactory
+import com.example.finalnews.databinding.ActivityMainBinding
 import com.firebase.ui.auth.AuthUI
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuth.AuthStateListener
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
-import com.google.firebase.database.ktx.getValue
 import com.google.firebase.ktx.Firebase
-import kotlinx.android.synthetic.main.activity_main.*
 
-class MainActivity : AppCompatActivity(),PublishersSlidePageFragment.OnItemClickListener,CategoriesSlidePageFragment.OnItemClickListener, CountriesSlidePageFragment.OnItemClickListener,SharedPreferences.OnSharedPreferenceChangeListener {
+class MainActivity : AppCompatActivity(),PublishersSlideFragment.OnItemClickListener,CategoriesSlideFragment.OnItemClickListener, CountriesSlideFragment.OnItemClickListener,SharedPreferences.OnSharedPreferenceChangeListener {
+
+    private lateinit var viewModelFactory: SelectionViewModelFactory
+    private lateinit var selectionViewModel: SelectionViewModel
+    private lateinit var pref: SharedPreferences
+    private lateinit var mFirebaseAuth: FirebaseAuth
+    private lateinit var sourceDB: DatabaseReference
+    private lateinit var settingsDB: DatabaseReference
+    private lateinit var binding: ActivityMainBinding
 
     companion object{
         private const val RC_SIGN_IN = 1
         const val SOURCES = "sources"
-        var mFirebaseSourcesInfo:SourcesInfo? = null
-        fun getSourceInfo():SourcesInfo? = mFirebaseSourcesInfo
         var TAG = "MainActivity"
     }
-    private lateinit var mFirebaseAuth: FirebaseAuth
-    private lateinit var sourceDB: DatabaseReference
-    private lateinit var settingsDB: DatabaseReference
-    private var mInterstitialAd: InterstitialAd? = null
-    var mUserSettings:UserSettings? = null
-    private lateinit var pref: SharedPreferences
-    private lateinit var mAuthStateListener: AuthStateListener
-    private var mSavedInstanceState:Bundle? = null
-    private lateinit var mValueEventListener1: ValueEventListener
-    private lateinit var mValueEventListener2: ValueEventListener
 
     override fun onCreate(savedInstanceState: Bundle?) {
         pref = PreferenceManager.getDefaultSharedPreferences(this)
@@ -69,137 +54,75 @@ class MainActivity : AppCompatActivity(),PublishersSlidePageFragment.OnItemClick
             setTheme(R.style.DarkTheme)
         }
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        setSupportActionBar(toolbar)
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
+        setSupportActionBar(binding.toolbar)
         Log.d(TAG,"oncreate")
-        sourceDB = Firebase.database.getReference(getString(R.string.users_label))
-        settingsDB = Firebase.database.getReference(resources.getString(R.string.users_label))
-        mFirebaseAuth = Firebase.auth
-        if(savedInstanceState!=null){
-            if(savedInstanceState.containsKey(SOURCES)){
-                Log.d(TAG, "restore onsave")
-                mFirebaseSourcesInfo = savedInstanceState.getParcelable(SOURCES)
-                updateUI(savedInstanceState,mFirebaseSourcesInfo)
-                mSavedInstanceState = savedInstanceState
-            }
-        }
         //AdMob - ca-app-pub-3940256099942544~3347511713 is a sample ID for testing. In production use the actual app ID
         MobileAds.initialize(this){}
         //AdMob "ca-app-pub-3940256099942544/1033173712" is a test ad unit ID. In production use the add ad unit ID.
-        if(mInterstitialAd == null){
-            loadAd()
-        }
-        mValueEventListener1 = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                mFirebaseSourcesInfo = snapshot.getValue<SourcesInfo>()
-                if (mFirebaseSourcesInfo == null) {
-                    val publishersSelected = arrayListOf<String>()
-                    val categoriesSelected = arrayListOf<String>()
-                    val countriesSelected = arrayListOf<String>()
-                    mFirebaseSourcesInfo = SourcesInfo(publishersSelected,categoriesSelected,countriesSelected)
-                }
-                Log.d(TAG, "valuelistener1")
-                updateNoOfItemsSelected()
-                updateUI(savedInstanceState, mFirebaseSourcesInfo)
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        mValueEventListener2 = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                mUserSettings = snapshot.getValue<UserSettings>()
-                val editor: Editor = pref.edit()
-                if (mUserSettings != null) {
-                    Log.d(TAG, "valuelistener2")
-                    val fontSize: String? = mUserSettings?.fontSize
-                    val theme: String? = mUserSettings?.theme
-                    val topHeadlinesCountry: String? = mUserSettings?.topHeadLinesCountry
-                    editor.putString(getString(R.string.pref_fontSize_key), fontSize)
-                    editor.putString(getString(R.string.theme_key), theme)
-                    editor.putString(getString(R.string.widgetKey_top_headlines),topHeadlinesCountry)
-                    editor.apply()
-                }
-                else {
-                    val locale: String = applicationContext.resources.configuration.locale.country
-                    val defaultCountry = locale.lowercase()
-                    val newUserSettings = UserSettings(getString(R.string.menu_medium_label),getString(R.string.lightLabel),defaultCountry)
-                    editor.putString(getString(R.string.pref_fontSize_key),newUserSettings.fontSize)
-                    editor.putString(getString(R.string.theme_key),newUserSettings.theme)
-                    editor.putString(getString(R.string.widgetKey_top_headlines),newUserSettings.topHeadLinesCountry)
-                    editor.apply()
-                    mFirebaseAuth.currentUser?.uid?.let { settingsDB.child(it).child(getString(R.string.settings_label)).setValue(newUserSettings) }
-                    //settingsDB.setValue(newUserSettings)
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        mAuthStateListener = AuthStateListener {
-            val user : FirebaseUser? = it.currentUser
-            if (user!=null){
-                Log.d(TAG, "AuthListener")
-                sourceDB.child(user.uid).child(getString(R.string.sources_label)).addValueEventListener(mValueEventListener1)
-                settingsDB.child(user.uid).child(getString(R.string.settings_label)).addValueEventListener(mValueEventListener2)
-            }
-            else{
-                val googleIdp:AuthUI.IdpConfig = AuthUI.IdpConfig.GoogleBuilder().build()
-                val facebookIdp:AuthUI.IdpConfig = AuthUI.IdpConfig.FacebookBuilder().build()
-                val emailIdp:AuthUI.IdpConfig = AuthUI.IdpConfig.EmailBuilder().build()
-                startActivityForResult(AuthUI.getInstance().createSignInIntentBuilder().setTheme(R.style.FirebaseLoginTheme).setIsSmartLockEnabled(false).setAvailableProviders(
-                    listOf(googleIdp,facebookIdp,emailIdp)
-                ).setLogo(R.drawable.communication).setTosAndPrivacyPolicyUrls(applicationContext.resources.getString(R.string.terms_of_service),applicationContext.resources.getString(R.string.privacy_policy)).build(),RC_SIGN_IN)
-            }
-        }
-        clear_all_label.setOnClickListener { clearAllLabels() }
-        done_label.setOnClickListener { doneLabel() }
-    }
 
-    private fun loadAd() {
-        InterstitialAd.load(this,getString(R.string.AdUnit_ID),AdRequest.Builder().build(),object : InterstitialAdLoadCallback(){
-            override fun onAdFailedToLoad(adError: LoadAdError) {
-                mInterstitialAd = null
-            }
-            override fun onAdLoaded(interstitialAd: InterstitialAd) {
-                Log.d(TAG, "Ad was loaded.")
-                mInterstitialAd = interstitialAd
-                mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback(){
-                    override fun onAdDismissedFullScreenContent() {
-                        mInterstitialAd = null
-                        mFirebaseAuth.currentUser?.uid?.let {
-                            sourceDB.child(it).child(getString(R.string.sources_label)).setValue(mFirebaseSourcesInfo)
-                        }
-                        val newsArticlesActivity = Intent(applicationContext, NewsArticles::class.java)
-                        newsArticlesActivity.putExtra(SOURCES, mFirebaseSourcesInfo)
-                        startActivity(newsArticlesActivity)
-                    }
-                    override fun onAdShowedFullScreenContent() {
+        viewModelFactory = SelectionViewModelFactory(application)
+        selectionViewModel = ViewModelProvider(this,viewModelFactory).get(SelectionViewModel::class.java)
+        binding.viewModel = selectionViewModel
+        mFirebaseAuth = Firebase.auth
+        sourceDB = Firebase.database.getReference(application.resources.getString(R.string.users_label))
+        settingsDB = Firebase.database.getReference(application.resources.getString(R.string.users_label))
 
-                    }
-                }
+        selectionViewModel.mFirebaseUser.observe(this, {
+            if(it==null){
+                val googleIdp: AuthUI.IdpConfig = AuthUI.IdpConfig.GoogleBuilder().build()
+                val facebookIdp: AuthUI.IdpConfig = AuthUI.IdpConfig.FacebookBuilder().build()
+                val emailIdp: AuthUI.IdpConfig = AuthUI.IdpConfig.EmailBuilder().build()
+                startActivityForResult(
+                    AuthUI.getInstance().createSignInIntentBuilder().setTheme(R.style.FirebaseLoginTheme).setIsSmartLockEnabled(false).setAvailableProviders(
+                        listOf(googleIdp,facebookIdp,emailIdp)
+                    ).setLogo(R.drawable.communication).setTosAndPrivacyPolicyUrls(application.resources.getString(
+                        R.string.terms_of_service),application.resources.getString(R.string.privacy_policy)).build(),RC_SIGN_IN
+                )
             }
         })
+
+        selectionViewModel.loadUI.observe(this,{
+            if(it){
+                updateUI()
+                updateNoOfItemsSelected()
+                selectionViewModel.onUILoadComplete()
+            }
+        })
+
+        selectionViewModel.newsArticlesNavigate.observe(this,{
+            if(it){
+                val newsArticlesActivity = Intent(applicationContext, NewsArticles::class.java)
+                newsArticlesActivity.putExtra(SOURCES, selectionViewModel.mSourceInfo.value)
+                startActivity(newsArticlesActivity)
+                selectionViewModel.onNewsArticlesNavigationComplete()
+            }
+        })
+
+        selectionViewModel.snackbarMsg.observe(this,{
+            showSnackbar(it)
+        })
+
+        selectionViewModel.showAD.observe(this,{
+            if(it){
+                selectionViewModel.mInterstitialAd?.show(this)
+                selectionViewModel.showInterstitialAdComplete()
+            }
+        })
+        binding.clearAllLabel.setOnClickListener { clearAllLabels() }
     }
 
-    private fun updateUI(savedInstanceState: Bundle?,mFirebaseSourcesInfo: SourcesInfo?){
-        mSavedInstanceState = savedInstanceState
-        setupViewPager(savedInstanceState,sources_container, mFirebaseSourcesInfo)
-        tabs.setupWithViewPager(sources_container)
+    private fun updateUI(){
+        setupViewPager(binding.sourcesContainer)
+        binding.tabs.setupWithViewPager(binding.sourcesContainer)
         Log.d(TAG, "update ui")
     }
 
-    private fun setupViewPager(savedInstanceState: Bundle?,viewPager: ViewPager,mFirebaseSourcesInfo: SourcesInfo?){
+    private fun setupViewPager(viewPager: ViewPager){
         val adapter = SectionsPageAdapter(supportFragmentManager)
-        val bundle : Bundle
-        if(savedInstanceState == null) {
-            bundle = Bundle()
-            bundle.putParcelable(SOURCES, mFirebaseSourcesInfo)
-        } else {
-            bundle = savedInstanceState
-        }
-        val mPublishersFragment = PublishersSlidePageFragment()
-        val mCategoriesFragment = CategoriesSlidePageFragment()
-        val mCountriesFragment = CountriesSlidePageFragment()
-        mPublishersFragment.arguments = bundle
-        mCategoriesFragment.arguments = bundle
-        mCountriesFragment.arguments = bundle
+        val mPublishersFragment = PublishersSlideFragment()
+        val mCategoriesFragment = CategoriesSlideFragment()
+        val mCountriesFragment = CountriesSlideFragment()
         adapter.addFragment(mPublishersFragment, resources.getString(R.string.publishers_label))
         adapter.addFragment(mCountriesFragment, resources.getString(R.string.countries_label))
         adapter.addFragment(mCategoriesFragment, resources.getString(R.string.categories_label))
@@ -235,29 +158,23 @@ class MainActivity : AppCompatActivity(),PublishersSlidePageFragment.OnItemClick
 
     override fun onPause() {
         super.onPause()
-        mFirebaseAuth.currentUser?.uid?.let {
-            sourceDB.child(it).child(getString(R.string.sources_label)).removeEventListener(mValueEventListener1)
-            settingsDB.child(it).child(getString(R.string.settings_label)).removeEventListener(mValueEventListener2)
-        }
-        mFirebaseAuth.removeAuthStateListener(mAuthStateListener)
         pref.unregisterOnSharedPreferenceChangeListener(this)
         Log.d(TAG, "released")
     }
 
     override fun onResume() {
         super.onResume()
-        mFirebaseAuth.addAuthStateListener(mAuthStateListener)
         pref.registerOnSharedPreferenceChangeListener(this)
     }
 
     private fun showSnackbar(message : String){
-        val view = findViewById<View>(R.id.mainLinearLayout)
+        val view = binding.mainLinearLayout
         val duration = Snackbar.LENGTH_SHORT
         Snackbar.make(view, message, duration).show()
     }
 
     override fun onItemClickPublishers(item: String) {
-        val mPublishersSelected = mFirebaseSourcesInfo?.mPublishersSelected
+        val mPublishersSelected = selectionViewModel.mSourceInfo.value?.mPublishersSelected
 
         if(mPublishersSelected != null){
             if(mPublishersSelected.contains(item)){
@@ -273,7 +190,7 @@ class MainActivity : AppCompatActivity(),PublishersSlidePageFragment.OnItemClick
     }
 
     override fun onItemClickCategories(item: String) {
-        val mCategoriesSelected = mFirebaseSourcesInfo?.mCategoriesSelected
+        val mCategoriesSelected = selectionViewModel.mSourceInfo.value?.mCategoriesSelected
         if(mCategoriesSelected != null){
             if(mCategoriesSelected.contains(item)){
                 mCategoriesSelected.remove(item)
@@ -289,7 +206,7 @@ class MainActivity : AppCompatActivity(),PublishersSlidePageFragment.OnItemClick
     }
 
     override fun onItemClickCountries(item: String) {
-        val mCountriesSelected = mFirebaseSourcesInfo?.mCountriesSelected
+        val mCountriesSelected = selectionViewModel.mSourceInfo.value?.mCountriesSelected
         if(mCountriesSelected != null){
             if(mCountriesSelected.contains(item)){
                 mCountriesSelected.remove(item)
@@ -305,47 +222,22 @@ class MainActivity : AppCompatActivity(),PublishersSlidePageFragment.OnItemClick
     }
 
     private fun updateNoOfItemsSelected(){
-        if(mFirebaseSourcesInfo?.mPublishersSelected != null || mFirebaseSourcesInfo?.mCategoriesSelected != null || mFirebaseSourcesInfo?.mCountriesSelected != null) {
-            val numberSelected = (mFirebaseSourcesInfo?.mPublishersSelected?.size ?: 0 )+ (mFirebaseSourcesInfo?.mCategoriesSelected?.size ?: 0) + (mFirebaseSourcesInfo?.mCountriesSelected?.size ?: 0)
+        if(selectionViewModel.mSourceInfo.value?.mPublishersSelected != null || selectionViewModel.mSourceInfo.value?.mCategoriesSelected != null || selectionViewModel.mSourceInfo.value?.mCountriesSelected != null) {
+            val numberSelected = (selectionViewModel.mSourceInfo.value?.mPublishersSelected?.size ?: 0 )+ (selectionViewModel.mSourceInfo.value?.mCategoriesSelected?.size ?: 0) + (selectionViewModel.mSourceInfo.value?.mCountriesSelected?.size ?: 0)
             val selectedLabel = "$numberSelected selected"
-            textView_no_items_selected.text = selectedLabel
+            binding.textViewNoItemsSelected.text = selectedLabel
         } else {
-            textView_no_items_selected.text = getString(R.string.selected_label)
+            binding.textViewNoItemsSelected.text = getString(R.string.selected_label)
         }
     }
 
     private fun clearAllLabels(){
         mFirebaseAuth.currentUser?.uid?.let {sourceDB.child(it).child(getString(R.string.sources_label)).setValue(null)}
-        mFirebaseSourcesInfo?.mPublishersSelected?.clear()
-        mFirebaseSourcesInfo?.mCountriesSelected?.clear()
-        mFirebaseSourcesInfo?.mCategoriesSelected?.clear()
+        selectionViewModel.mSourceInfo.value?.mPublishersSelected?.clear()
+        selectionViewModel.mSourceInfo.value?.mCountriesSelected?.clear()
+        selectionViewModel.mSourceInfo.value?.mCategoriesSelected?.clear()
         updateNoOfItemsSelected()
-        updateUI(mSavedInstanceState, mFirebaseSourcesInfo)
-    }
-
-    private fun doneLabel(){
-        if(mFirebaseSourcesInfo?.mCountriesSelected?.size==0 && mFirebaseSourcesInfo?.mCategoriesSelected?.size==0 && mFirebaseSourcesInfo?.mPublishersSelected?.size==0){
-            val msg = "Please select news sources"
-            showSnackbar(msg)
-        }else if(mFirebaseSourcesInfo?.mPublishersSelected?.size==0){
-            val msg = "Please select a publisher"
-            showSnackbar(msg)
-        }else if(mFirebaseSourcesInfo?.mCategoriesSelected?.size==0){
-            val msg = "Please select a category"
-            showSnackbar(msg)
-        }else if(mFirebaseSourcesInfo?.mCountriesSelected?.size==0){
-            val msg = "Please select a country"
-            showSnackbar(msg)
-        }else {
-            if(mInterstitialAd!=null)
-                mInterstitialAd?.show(this)
-        }
-    }
-
-    override fun onSaveInstanceState(outState:Bundle) {
-        Log.d(TAG,"onsave")
-        super.onSaveInstanceState(outState)
-        outState.putParcelable(SOURCES, mFirebaseSourcesInfo)
+        updateUI()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
