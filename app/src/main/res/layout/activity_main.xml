@@ -62,6 +62,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/clear_all_label"
+                android:onClick="@{() -> viewModel.clearAllLabels()}"
                 android:textAllCaps="false"
                 android:textSize="18sp" />
 

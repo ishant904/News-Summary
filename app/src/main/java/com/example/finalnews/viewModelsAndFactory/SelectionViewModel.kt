@@ -27,7 +27,6 @@ import com.google.firebase.ktx.Firebase
 
 class SelectionViewModel(private val application: Application) : ViewModel() {
 
-    var mSourceInfo = MutableLiveData<SourcesInfo?>()
     var mCategoriesSelectedLv = MutableLiveData<ArrayList<String>?>()
     var mCountriesSelectedLv = MutableLiveData<ArrayList<String>?>()
     var mPublishersSelectedLv = MutableLiveData<ArrayList<String>?>()
@@ -38,11 +37,11 @@ class SelectionViewModel(private val application: Application) : ViewModel() {
     val showAD = MutableLiveData<Boolean>()
     val loadUI = MutableLiveData<Boolean>()
 
-    private var sourceDB: DatabaseReference = Firebase.database.getReference(application.resources.getString(R.string.users_label))
-    private var settingsDB: DatabaseReference = Firebase.database.getReference(application.resources.getString(R.string.users_label))
+    private val sourceDB: DatabaseReference = Firebase.database.getReference(application.resources.getString(R.string.users_label))
+    private val settingsDB: DatabaseReference = Firebase.database.getReference(application.resources.getString(R.string.users_label))
     private val applicationResource = application.resources
-    private var mFirebaseAuth: FirebaseAuth = Firebase.auth
-    private var authListener:FirebaseAuth.AuthStateListener
+    private val mFirebaseAuth: FirebaseAuth = Firebase.auth
+    private val authListener:FirebaseAuth.AuthStateListener
     var mInterstitialAd: InterstitialAd? = null
 
     init {
@@ -58,11 +57,18 @@ class SelectionViewModel(private val application: Application) : ViewModel() {
         loadAd()
     }
 
-    private fun initializeSourceInfoArray() {
+    private fun initializeSourceInfoArray(mSourceInfo:SourcesInfo?) {
+        if (mSourceInfo == null) {
+            mPublishersSelectedLv.value = arrayListOf()
+            mCategoriesSelectedLv.value = arrayListOf()
+            mCountriesSelectedLv.value = arrayListOf()
+        }
+        else{
+            mPublishersSelectedLv.value = mSourceInfo.mPublishersSelected
+            mCategoriesSelectedLv.value = mSourceInfo.mCategoriesSelected
+            mCountriesSelectedLv.value = mSourceInfo.mCountriesSelected
+        }
         onUILoaded()
-        mCategoriesSelectedLv.value = mSourceInfo.value?.mCategoriesSelected
-        mCountriesSelectedLv.value = mSourceInfo.value?.mCountriesSelected
-        mPublishersSelectedLv.value = mSourceInfo.value?.mPublishersSelected
     }
 
     private fun initializeUserSettings(currentUser: FirebaseUser) {
@@ -101,16 +107,9 @@ class SelectionViewModel(private val application: Application) : ViewModel() {
     private fun initializeSourceInfo(currentUser: FirebaseUser) {
         sourceDB.child(currentUser.uid).child(application.resources.getString(R.string.sources_label)).addValueEventListener(object : ValueEventListener{
             override fun onDataChange(snapshot: DataSnapshot) {
-                mSourceInfo.value = snapshot.getValue<SourcesInfo>()
-                if (mSourceInfo.value == null) {
-                    val publishersSelected = arrayListOf<String>()
-                    val categoriesSelected = arrayListOf<String>()
-                    val countriesSelected = arrayListOf<String>()
-                    mSourceInfo.value = SourcesInfo(publishersSelected,categoriesSelected,countriesSelected)
-                }
+                val mSourceInfo = snapshot.getValue<SourcesInfo>()
+                initializeSourceInfoArray(mSourceInfo)
                 Log.d(SelectionViewModel::class.java.name, "valuelistener1")
-
-                initializeSourceInfoArray()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -129,7 +128,8 @@ class SelectionViewModel(private val application: Application) : ViewModel() {
                     override fun onAdDismissedFullScreenContent() {
                         mInterstitialAd = null
                         mFirebaseAuth.currentUser?.uid?.let {
-                            sourceDB.child(it).child(applicationResource.getString(R.string.sources_label)).setValue(mSourceInfo.value)
+                            val mSourcesInfo = SourcesInfo(mPublishersSelectedLv.value,mCategoriesSelectedLv.value,mCountriesSelectedLv.value)
+                            sourceDB.child(it).child(applicationResource.getString(R.string.sources_label)).setValue(mSourcesInfo)
                         }
                         onNewsArticlesNavigate()
                     }
@@ -151,6 +151,53 @@ class SelectionViewModel(private val application: Application) : ViewModel() {
         }else {
             showInterstitialAd()
         }
+    }
+
+    fun clearAllLabels(){
+        mFirebaseUser.value?.uid?.let {sourceDB.child(it).child(applicationResource.getString(R.string.sources_label)).setValue(null)}
+        initializeSourceInfoArray(null)
+    }
+
+    fun onPublisherClicked(item: String){
+        mPublishersSelectedLv.value?.let {
+            if(it.contains(item)){
+                it.remove(item)
+                snackbarMsg.value = "You have removed $item"
+            }
+            else{
+                it.add(item)
+                snackbarMsg.value = "You have added $item"
+            }
+        }
+        mPublishersSelectedLv.value = mPublishersSelectedLv.value
+    }
+
+    fun onCategoryClicked(item: String){
+        mCategoriesSelectedLv.value?.let {
+            if(it.contains(item)){
+                it.remove(item)
+                snackbarMsg.value = "You have removed $item"
+            }
+            else{
+                it.add(item)
+                snackbarMsg.value = "You have added $item"
+            }
+        }
+        mCategoriesSelectedLv.value = mCategoriesSelectedLv.value
+    }
+
+    fun onCountryClicked(item: String){
+        mCountriesSelectedLv.value?.let {
+            if(it.contains(item)){
+                it.remove(item)
+                snackbarMsg.value = "You have removed $item"
+            }
+            else{
+                it.add(item)
+                snackbarMsg.value = "You have added $item"
+            }
+        }
+        mCountriesSelectedLv.value = mCountriesSelectedLv.value
     }
 
     private fun showInterstitialAd() {
@@ -175,6 +222,10 @@ class SelectionViewModel(private val application: Application) : ViewModel() {
 
     fun onUILoadComplete(){
         loadUI.value = false
+    }
+
+    fun onSnackBarShown(){
+        snackbarMsg.value = ""
     }
 
     override fun onCleared() {

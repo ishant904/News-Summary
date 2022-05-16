@@ -64,13 +64,9 @@ class PublishersSlideFragment : Fragment() {
         return if (nColumns < 2) 2 else nColumns
     }
 
-    inner class PublishersAdapter : RecyclerView.Adapter<PublishersAdapter.PublishersAdapterViewHolder>() {
+    inner class PublishersAdapter : RecyclerView.Adapter<PublishersSlideFragment.PublishersAdapter.PublishersAdapterViewHolder>() {
 
         var data:ArrayList<String>? = arrayListOf()
-            set(value) {
-                field = value
-                notifyDataSetChanged()
-            }
 
         override fun onCreateViewHolder(parent: ViewGroup,viewType: Int): PublishersAdapterViewHolder {
             val context = parent.context
@@ -83,12 +79,13 @@ class PublishersSlideFragment : Fragment() {
             holder.mPublisherImageView.setImageResource(mThumbIds[position])
             holder.mPublisherTextView.text = mPublishers[position]
             holder.bind(mPublishers[position], listener, position)
-            if (sharedViewModel.mSourceInfo.value?.mPublishersSelected?.contains(mPublishers[position]) == true) {
+            if (data?.contains(mPublishers[position]) == true) {
                 //source has been selected
                 holder.mPublisherConstraintLayout.setBackgroundColor(resources.getColor(R.color.colorPrimaryDark))
             } else {
                 holder.mPublisherConstraintLayout.setBackgroundColor(Color.TRANSPARENT)
             }
+            Log.d(PublishersSlideFragment::class.java.simpleName,"onbind")
         }
 
         override fun getItemCount(): Int {
@@ -102,12 +99,13 @@ class PublishersSlideFragment : Fragment() {
 
             fun bind(mPublisher: String, clickListener: OnItemClickListener, position: Int) {
                 itemView.setOnClickListener {
+                    notifyItemChanged(position)
                     clickListener.onItemClickPublishers(mPublisher)
                 }
             }
         }
     }
-    val mThumbIds = arrayOf<Int>(
+    val mThumbIds = arrayOf(
         R.drawable.abc_news, R.drawable.abc_news_au,
         R.drawable.aftenposten, R.drawable.aljazeera_english,
         R.drawable.bbc, R.drawable.cbs_news,
@@ -154,18 +152,5 @@ class PublishersSlideFragment : Fragment() {
         "NYT",
         "Wall Street Journal"
     )
-
-}
-
-class PublishersDiffCallback : DiffUtil.ItemCallback<String>() {
-
-    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
-        return oldItem === newItem
-    }
-
-
-    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
-        return oldItem == newItem
-    }
 
 }

@@ -46,10 +46,10 @@ class CategoriesSlideFragment : Fragment() {
         val mAdapter = CategoriesAdapter()
         mRecyclerView.adapter = mAdapter
 
-        sharedViewModel.mCategoriesSelectedLv.observe(viewLifecycleOwner, Observer {
+        sharedViewModel.mCategoriesSelectedLv.observe(viewLifecycleOwner) {
             mAdapter.data = it
-            Log.d(CategoriesSlideFragment::class.java.name,"categories observer data changed")
-        })
+            Log.d(CategoriesSlideFragment::class.java.name, "categories observer data changed")
+        }
 
         return rootView
     }
@@ -57,10 +57,6 @@ class CategoriesSlideFragment : Fragment() {
     inner class CategoriesAdapter : RecyclerView.Adapter<CategoriesAdapter.CategoriesAdapterViewHolder>() {
 
         var data:ArrayList<String>? = arrayListOf()
-            set(value) {
-                field = value
-                notifyDataSetChanged()
-            }
 
         override fun onCreateViewHolder(parent: ViewGroup,viewType: Int): CategoriesAdapterViewHolder {
             val context = parent.context
@@ -73,8 +69,8 @@ class CategoriesSlideFragment : Fragment() {
         override fun onBindViewHolder(holder: CategoriesAdapterViewHolder,position: Int) {
             holder.mCategoryImageView.setImageResource(mThumbIds[position])
             holder.mCategoryTextView.text = mCategories[position]
-            holder.bind(mCategories[position], listener)
-            if (sharedViewModel.mSourceInfo.value?.mCategoriesSelected?.contains(mCategories[position]) == true) {
+            holder.bind(mCategories[position], listener, position)
+            if (data?.contains(mCategories[position]) == true) {
                 holder.mCategoryConstraintLayout.setBackgroundColor(resources.getColor(R.color.colorPrimaryDark))
             } else {
                 holder.mCategoryConstraintLayout.setBackgroundColor(Color.TRANSPARENT)
@@ -90,8 +86,9 @@ class CategoriesSlideFragment : Fragment() {
             val mCategoryImageView: ImageView = itemView.findViewById(R.id.categories_icon)
             val mCategoryTextView: AutofitTextView = itemView.findViewById(R.id.categories_desc)
 
-            fun bind(mCategory: String,clickListener: OnItemClickListener) {
+            fun bind(mCategory: String,clickListener: OnItemClickListener, position: Int) {
                 itemView.setOnClickListener {
+                    notifyItemChanged(position)
                     clickListener.onItemClickCategories(mCategory)
                 }
             }
@@ -106,17 +103,4 @@ class CategoriesSlideFragment : Fragment() {
         "Business", "Entertainment", "Health", "Science",
         "Sports", "Technology"
     )
-}
-
-class CategoriesDiffCallback : DiffUtil.ItemCallback<String>() {
-
-    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
-        return oldItem === newItem
-    }
-
-
-    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
-        return oldItem == newItem
-    }
-
 }

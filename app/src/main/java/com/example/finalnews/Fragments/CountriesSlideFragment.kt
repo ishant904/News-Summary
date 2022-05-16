@@ -56,10 +56,6 @@ class CountriesSlideFragment : Fragment() {
      inner class CountriesAdapter() : RecyclerView.Adapter<CountriesAdapter.CountriesAdapterViewHolder>() {
 
          var data:ArrayList<String>? = arrayListOf()
-             set(value) {
-                 field = value
-                 notifyDataSetChanged()
-             }
 
          override fun onCreateViewHolder(parent: ViewGroup,viewType: Int): CountriesAdapterViewHolder {
              val context = parent.context
@@ -72,8 +68,8 @@ class CountriesSlideFragment : Fragment() {
          override fun onBindViewHolder(holder: CountriesAdapterViewHolder,position: Int) {
              holder.mCountryImageView.setImageResource(mThumbIds[position])
              holder.mCountryTextView.text = mCountries[position]
-             holder.bind(mCountries[position], listener)
-             if (sharedViewModel.mSourceInfo.value?.mCountriesSelected?.contains(mCountries[position]) == true) {
+             holder.bind(mCountries[position], listener, position)
+             if (data?.contains(mCountries[position]) == true) {
                  holder.mCountryConstraintLayout.setBackgroundColor(resources.getColor(R.color.colorPrimaryDark))
              } else {
                  holder.mCountryConstraintLayout.setBackgroundColor(Color.TRANSPARENT)
@@ -89,8 +85,9 @@ class CountriesSlideFragment : Fragment() {
               val mCountryImageView: ImageView = itemView.findViewById(R.id.countries_icon)
               val mCountryTextView: TextView = itemView.findViewById(R.id.countries_desc)
 
-              fun bind(mCountry: String,clickListener: OnItemClickListener) {
+              fun bind(mCountry: String,clickListener: OnItemClickListener, position: Int) {
                   itemView.setOnClickListener {
+                      notifyItemChanged(position)
                       clickListener.onItemClickCountries(mCountry)
                   }
               }
@@ -210,17 +207,4 @@ class CountriesSlideFragment : Fragment() {
         "U.S.A",
         "Venezuela"
     )
-}
-
-class CountriesDiffCallback : DiffUtil.ItemCallback<String>() {
-
-    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
-        return oldItem === newItem
-    }
-
-
-    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
-        return oldItem == newItem
-    }
-
 }

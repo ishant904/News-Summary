@@ -16,6 +16,7 @@ import com.example.finalnews.Adapters.SectionsPageAdapter
 import com.example.finalnews.Fragments.CategoriesSlideFragment
 import com.example.finalnews.Fragments.CountriesSlideFragment
 import com.example.finalnews.Fragments.PublishersSlideFragment
+import com.example.finalnews.Sources.SourcesInfo
 import com.example.finalnews.viewModelsAndFactory.SelectionViewModel
 import com.example.finalnews.viewModelsAndFactory.SelectionViewModelFactory
 import com.example.finalnews.databinding.ActivityMainBinding
@@ -34,8 +35,6 @@ class MainActivity : AppCompatActivity(),PublishersSlideFragment.OnItemClickList
     private lateinit var selectionViewModel: SelectionViewModel
     private lateinit var pref: SharedPreferences
     private lateinit var mFirebaseAuth: FirebaseAuth
-    private lateinit var sourceDB: DatabaseReference
-    private lateinit var settingsDB: DatabaseReference
     private lateinit var binding: ActivityMainBinding
 
     companion object{
@@ -65,51 +64,62 @@ class MainActivity : AppCompatActivity(),PublishersSlideFragment.OnItemClickList
         selectionViewModel = ViewModelProvider(this,viewModelFactory).get(SelectionViewModel::class.java)
         binding.viewModel = selectionViewModel
         mFirebaseAuth = Firebase.auth
-        sourceDB = Firebase.database.getReference(application.resources.getString(R.string.users_label))
-        settingsDB = Firebase.database.getReference(application.resources.getString(R.string.users_label))
 
-        selectionViewModel.mFirebaseUser.observe(this, {
-            if(it==null){
+        selectionViewModel.mFirebaseUser.observe(this) {
+            if (it == null) {
                 val googleIdp: AuthUI.IdpConfig = AuthUI.IdpConfig.GoogleBuilder().build()
                 val facebookIdp: AuthUI.IdpConfig = AuthUI.IdpConfig.FacebookBuilder().build()
                 val emailIdp: AuthUI.IdpConfig = AuthUI.IdpConfig.EmailBuilder().build()
                 startActivityForResult(
-                    AuthUI.getInstance().createSignInIntentBuilder().setTheme(R.style.FirebaseLoginTheme).setIsSmartLockEnabled(false).setAvailableProviders(
-                        listOf(googleIdp,facebookIdp,emailIdp)
-                    ).setLogo(R.drawable.communication).setTosAndPrivacyPolicyUrls(application.resources.getString(
-                        R.string.terms_of_service),application.resources.getString(R.string.privacy_policy)).build(),RC_SIGN_IN
+                    AuthUI.getInstance().createSignInIntentBuilder()
+                        .setTheme(R.style.FirebaseLoginTheme).setIsSmartLockEnabled(false)
+                        .setAvailableProviders(
+                            listOf(googleIdp, facebookIdp, emailIdp)
+                        ).setLogo(R.drawable.communication).setTosAndPrivacyPolicyUrls(
+                        application.resources.getString(
+                            R.string.terms_of_service
+                        ), application.resources.getString(R.string.privacy_policy)
+                    ).build(), RC_SIGN_IN
                 )
             }
-        })
+        }
 
-        selectionViewModel.loadUI.observe(this,{
-            if(it){
+        selectionViewModel.loadUI.observe(this) {
+            if (it) {
                 updateUI()
                 updateNoOfItemsSelected()
-                selectionViewModel.onUILoadComplete()
             }
-        })
+        }
 
-        selectionViewModel.newsArticlesNavigate.observe(this,{
-            if(it){
+        selectionViewModel.newsArticlesNavigate.observe(this) {
+            if (it) {
                 val newsArticlesActivity = Intent(applicationContext, NewsArticles::class.java)
-                newsArticlesActivity.putExtra(SOURCES, selectionViewModel.mSourceInfo.value)
+                val mSourceInfo = SourcesInfo(
+                    selectionViewModel.mPublishersSelectedLv.value,
+                    selectionViewModel.mCategoriesSelectedLv.value,
+                    selectionViewModel.mCountriesSelectedLv.value
+                )
+                newsArticlesActivity.putExtra(SOURCES, mSourceInfo)
                 startActivity(newsArticlesActivity)
                 selectionViewModel.onNewsArticlesNavigationComplete()
             }
-        })
+        }
 
-        selectionViewModel.snackbarMsg.observe(this,{
-            showSnackbar(it)
-        })
+        selectionViewModel.snackbarMsg.observe(this) {
+            if (it.isNotEmpty()) {
+                showSnackbar(it)
+                selectionViewModel.onSnackBarShown()
+            }
+        }
 
-        selectionViewModel.showAD.observe(this,{
-            if(it){
+        selectionViewModel.showAD.observe(this) {
+            if (it) {
                 selectionViewModel.mInterstitialAd?.show(this)
                 selectionViewModel.showInterstitialAdComplete()
+                selectionViewModel.onUILoadComplete()
             }
-        })
-        binding.clearAllLabel.setOnClickListener { clearAllLabels() }
+        }
+
     }
 
     private fun updateUI(){
@@ -159,7 +169,6 @@ class MainActivity : AppCompatActivity(),PublishersSlideFragment.OnItemClickList
     override fun onPause() {
         super.onPause()
         pref.unregisterOnSharedPreferenceChangeListener(this)
-        Log.d(TAG, "released")
     }
 
     override fun onResume() {
@@ -174,70 +183,28 @@ class MainActivity : AppCompatActivity(),PublishersSlideFragment.OnItemClickList
     }
 
     override fun onItemClickPublishers(item: String) {
-        val mPublishersSelected = selectionViewModel.mSourceInfo.value?.mPublishersSelected
-
-        if(mPublishersSelected != null){
-            if(mPublishersSelected.contains(item)){
-                mPublishersSelected.remove(item)
-                val message = "You have removed $item"
-                showSnackbar(message)
-            } else {
-                mPublishersSelected.add(item)
-                showSnackbar("You have added $item")
-            }
-        }
+        selectionViewModel.onPublisherClicked(item)
         updateNoOfItemsSelected()
     }
 
     override fun onItemClickCategories(item: String) {
-        val mCategoriesSelected = selectionViewModel.mSourceInfo.value?.mCategoriesSelected
-        if(mCategoriesSelected != null){
-            if(mCategoriesSelected.contains(item)){
-                mCategoriesSelected.remove(item)
-                val message = "You have removed $item"
-                showSnackbar(message)
-            } else {
-                mCategoriesSelected.add(item)
-                val message = "You have added $item"
-                showSnackbar(message)
-            }
-        }
+        selectionViewModel.onCategoryClicked(item)
         updateNoOfItemsSelected()
     }
 
     override fun onItemClickCountries(item: String) {
-        val mCountriesSelected = selectionViewModel.mSourceInfo.value?.mCountriesSelected
-        if(mCountriesSelected != null){
-            if(mCountriesSelected.contains(item)){
-                mCountriesSelected.remove(item)
-                val message = "You have removed $item"
-                showSnackbar(message)
-            } else {
-                mCountriesSelected.add(item)
-                val message = "You have added $item"
-                showSnackbar(message)
-            }
-        }
+        selectionViewModel.onCountryClicked(item)
         updateNoOfItemsSelected()
     }
 
     private fun updateNoOfItemsSelected(){
-        if(selectionViewModel.mSourceInfo.value?.mPublishersSelected != null || selectionViewModel.mSourceInfo.value?.mCategoriesSelected != null || selectionViewModel.mSourceInfo.value?.mCountriesSelected != null) {
-            val numberSelected = (selectionViewModel.mSourceInfo.value?.mPublishersSelected?.size ?: 0 )+ (selectionViewModel.mSourceInfo.value?.mCategoriesSelected?.size ?: 0) + (selectionViewModel.mSourceInfo.value?.mCountriesSelected?.size ?: 0)
+        if(selectionViewModel.mPublishersSelectedLv.value != null || selectionViewModel.mCategoriesSelectedLv.value != null || selectionViewModel.mCountriesSelectedLv.value != null) {
+            val numberSelected = (selectionViewModel.mPublishersSelectedLv.value?.size ?: 0 ) + (selectionViewModel.mCategoriesSelectedLv.value?.size ?: 0) + (selectionViewModel.mCountriesSelectedLv.value?.size ?: 0)
             val selectedLabel = "$numberSelected selected"
             binding.textViewNoItemsSelected.text = selectedLabel
         } else {
             binding.textViewNoItemsSelected.text = getString(R.string.selected_label)
         }
-    }
-
-    private fun clearAllLabels(){
-        mFirebaseAuth.currentUser?.uid?.let {sourceDB.child(it).child(getString(R.string.sources_label)).setValue(null)}
-        selectionViewModel.mSourceInfo.value?.mPublishersSelected?.clear()
-        selectionViewModel.mSourceInfo.value?.mCountriesSelected?.clear()
-        selectionViewModel.mSourceInfo.value?.mCategoriesSelected?.clear()
-        updateNoOfItemsSelected()
-        updateUI()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
@@ -249,6 +216,6 @@ class MainActivity : AppCompatActivity(),PublishersSlideFragment.OnItemClickList
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG,"shared release")
+        Log.d(TAG,"destroy")
     }
 }
